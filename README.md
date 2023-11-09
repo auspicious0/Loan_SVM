@@ -95,29 +95,61 @@ lo %>% str()
 
 ### 3-2. 이상값 처리
 
+결측값은 앞서 살펴본 대로 없기 때문에 이상값 처리를 진행하겠습니다.
 
 
-종속변수는 revenue로 하고 나머지를 설명 변수로 처리해 수익을 예측해 보겠습니다.
-
-chr형 변수 genres, original_language, status는 factor형으로 변환하겠습니다.
-
-이중 정수형 변수 budget, popularity, revenue, runtime은 결측값 처리 후 이상값을 처리하겠습니다.
 ```
-mr <- select(mr,budget,genres,original_language,popularity,runtime,revenue,status)%>%
-  mutate_at(c("genres","original_language","status"),factor)
+# 이상치 및 결측값 처리 함수
 
-# 'genres' 열에서 "{'id': xxx, 'name': 'yyy'}" 중 'yyy' 부분 추출
-mr$genres <- gsub(".*'name':\\s*'([^']*)'.*", "\\1", as.character(mr$genres))
+calculate_outliers <- function(data, column_name) {
+  iqr_value <- IQR(data[[column_name]])
+  upper_limit <- summary(data[[column_name]])[5] + 1.5 * iqr_value
+  lower_limit <- summary(data[[column_name]])[2] - 1.5 * iqr_value
 
-mr <- mr %>%
-  mutate_at(c("genres"),factor)
+  data[[column_name]] <- ifelse(data[[column_name]] < lower_limit | data[[column_name]] > upper_limit, NA, data[[column_name]])
+
+  return(data)
+}
+table(is.na(lo))
+# boxplot 을 그리기 위해 factor형 변수를 삭제해 lo_에 저장하겠습니다.
+lo_ <- lo %>% select(-credit.policy, -purpose, -pub.rec, -not.fully.paid)
+boxplot(lo_)
+# 이상치 및 결측값 처리 및 결과에 대한 상자그림 그리기
+lo <- calculate_outliers(lo, "int.rate")
+lo <- calculate_outliers(lo, "installment")
+lo <- calculate_outliers(lo, "log.annual.inc")
+lo <- calculate_outliers(lo, "dti")
+lo <- calculate_outliers(lo, "fico")
+lo <- calculate_outliers(lo, "days.with.cr.line")
+lo <- calculate_outliers(lo, "revol.bal")
+lo <- calculate_outliers(lo, "revol.util")
+lo <- calculate_outliers(lo, "inq.last.6mths")
+lo <- calculate_outliers(lo, "delinq.2yrs")
+
+table(is.na(lo))
+lo <- na.omit(lo)
+table(is.na(lo))
+lo_ <- lo %>% select(-credit.policy, -purpose, -pub.rec, -not.fully.paid)
+boxplot(lo_)
 ```
 
-### 3-3. 중간값 처리 및 이상값 처리 
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/97c92c08-7174-4d12-88dd-cff44b5129ee)
 
-budget, revenue 변수는 결측값은 너무 많기 때문에 중간값으로 정리하고 나머지 결측값은 삭제하겠습니다.
+이상값이 삭제되었습니다. 그림을 통해 살펴보겠습니다. 
 
-그 후 정수형 데이터는 이상값 처리를 진행하겠습니다.
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/875f63ba-9aab-4257-8405-60d88a5392bb)
+
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/01e4d687-aef4-46ef-903f-45ed0af40555)
+
+이상값이 없어진 것을 직관적으로 확인할 수 있습니다.
+
+
+
+### 3-3. 데이터 분할
+
+데이터를 test 데이터와 train 데이터로 분할하여 train 데이터론 모델링을 진행하고 test 데이터를 통해 예측을 진행해 보겠습니다.
+
+무작위로 데이터를 분리하지 않고 반응변수를 중심으로 8:2로 나누기 위해 caret::createDataPartition을 사용하겠습니다.
 
 ```
 install.packages("Hmisc")
