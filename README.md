@@ -218,11 +218,12 @@ cm
 
 이제 하이퍼 파라메터를 조정해보겠습니다.
 
-### 4-2. 하이퍼 파라메터 조
+### 4-2. 하이퍼 파라메터 
 
 곡률(gamma)과 마진 폭(cost)을 결정하기 위해 튜닝 작업을 수행하겠습니다.
 
 gamma는 10^(-8:1), cost는 1~30 범위로 총 300개 조합으로 튜닝을 진행해 최적의 하이퍼 파라미터를 찾아 저장하려했으나 데이터의 양이 많아 튜닝이 진행되지 않습니다. 따라서 더 작은 범위로 축소하겠습니다. (10^(-3:1), cost = 1:10, 30개 조합)
+
 
 또 병렬 처리를 진행하겠습니다. tunecontrol 매개변수를 사용하여 병렬 처리를 활성화 해보겠습니다.
 
@@ -230,82 +231,79 @@ gamma는 10^(-8:1), cost는 1~30 범위로 총 300개 조합으로 튜닝을 진
 install.packages("doParallel")
 library(doParallel)
 registerDoParallel(cores = 4)
+tuned <- e1071::tune.svm(not.fully.paid ~ ., data = train, gamma = 10^(-8:1),cost = 1:30)
 tuned <- e1071::tune.svm(not.fully.paid ~ ., data = train, gamma = 10^(-3:1),cost = 1:10)
 ```
 
-revenue의 평균값 미만 데이터는 0,
-
-revenue의 평균값 이상 데이터는 1로 변환 후
-
-factor형으로 형변환하겠습니다.
+하지만 2시간 넘게 진행되지 않았습니다. 데이터 양이 너무 많기 때문입니다. 따라서 최적의 파라미터 값으로 gamma를 10, cost를 1이라 가정한 채 프로젝트를 진행해 보았습니다.
 
 ```
-# revenue 열의 평균값 계산
-revenue_mean <- mean(mr$revenue, na.rm = TRUE)
-
-# 변환: revenue 열 값이 revenue 평균값 미만인 경우 0, 이상인 경우 1로 변경
-mr$revenue <- ifelse(mr$revenue < revenue_mean, 0, 1)
-
-# factor 데이터 유형으로 변환
-mr$revenue <- factor(mr$revenue)
-```
-
-모델을 사용하여 test 데이터로 예측을 수행한 후 예측값을 저장하고 실제 데이터와 대조하여 확인해 보겠습니다.
-(앞 코드와 동일합니다.)
-
-![image](https://github.com/auspicious0/MovieRevenue/assets/108572025/92413583-297a-4e99-b4bc-49e7cf34415d)
-
-예측된 결과 어느 정도 예측을 수행한 것으로 확인할 수 있습니다. 
-
-confusionMatrix를 활용하여 성능지표를 확인하겠습니다.
+tuned <- e1071::tune.svm(not.fully.paid ~ ., data = train, gamma = 10,cost = 1)
 
 ```
-cm <- caret::confusionMatrix(predict_check_bagging$predict_value_bagging,test$revenue)
+하지만 크게 의미가 없는 것이라 판단되었습니다.
+
+따라서 데이터 양을 상당히 줄인 후 다시 진행해 보았습니다.(train test를 0.01:99.99 로 나눠 진행해 보았습니다.)
+
+```
+tuned <- e1071::tune.svm(not.fully.paid ~ ., data = train, gamma = 10^(-8:1),cost = 1:30)
+
+summary(tuned)
+
+best_param <- summary(tuned)$best.parameters
+best_param
+```
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/05c4215d-83c4-447a-84fb-02fb62360fb2)
+
+
+### 4-3. 하이퍼 파라미터를 적용한 svm모델 생성
+
+train 데이터를 이용하여 위에서 구한 하이퍼 파라미터를 적용한 svm 모델을 생성하고 분류 결과를 확인해 보겠습니다.
+
+confusionMatrix를 생성하여 분류결과의 정확도 및 성능지표를 확인해 보겠습니다.
+
+```
+svm_best <- e1071::svm(formula = not.fully.paid ~ ., data = train, type = "C-classification", kernel = "radial", gamma = best_param[1,1], cost = best_param[1,2])
+summary(svm_best)
+
+print("svm_best : train 데이터 분류 결과")
+table(predict(svm_best, train), train$not.fully.paid)
+
+print("svm_best : train 데이터 confusionMatrix 결과")
+cm <- caret::confusionMatrix(predict(svm_best, train), train$not.fully.paid)
 cm
 ```
 
-![image](https://github.com/auspicious0/MovieRevenue/assets/108572025/b7b702e4-9943-45ee-9a6f-14567ba835fd)
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/73809b19-83c7-407c-bf13-c386c4e146b6)
 
-이제 train 데이터로 RandomForest 모델을 만들어 보겠습니다.
+이제 test 데이터를 통해 모델의 예측력을 확인해 보겠습니다.
 
-```
-library(randomForest)
-model_rf <- randomForest(revenue ~ ., data = train, na.action = na.omit, importance = T, mtry = 7, ntree = 1000)
-model_rf
-```
-
-만든 랜덤포레스트 모델로 예측을 수행한 후 실제 값과 결과를 비교해 보겠습니다.
-
-(앞 코드와 동일합니다.)
-
-![image](https://github.com/auspicious0/MovieRevenue/assets/108572025/e7e29874-e987-4a85-b032-288c381130b1)
-
-예측을 잘 수행한 것을 확인할 수 있습니다.
-
-이제 예측값을 저장한 데이터와 실제 데이터 사이의 confusionMatrix를 생성한 후 성능지표를 확인해 보겠습니다.
+confusionMarix()를 생성하여 성능지표 역시 확인해 보겠습니다.
 
 ```
-cm <- caret::confusionMatrix(predict_check_rf$predict_value_rf,test$revenue)
+predict_value_svm <- predict(svm_best, test, type = "C-classification") %>%
+  tibble(predict_value_svm = .)
+predict_check_svm <-test %>% select(not.fully.paid) %>% dplyr::bind_cols(.,predict_value_svm)
+head(predict_check_svm)
+
+cm <- caret::confusionMatrix(predict(svm_best,test), test$not.fully.paid)
 cm
-```
-
-![image](https://github.com/auspicious0/MovieRevenue/assets/108572025/555aa85a-9a96-4fe6-981c-69677ef9c7ff)
-
-
-RandomForest 보다 bagging이 정확도, 민감도 등 여러 측면에서 나은 결과를 보이는 것을 확인할 수 있습니다. (75프로)
-
-모델에서 변수의 중요도를 그림으로 나타내 보겠습니다.
 
 ```
-varImpPlot(model_rf, type = 2, pch = 19, col = 1, cex = 1, main = "")
-```
-
-![image](https://github.com/auspicious0/MovieRevenue/assets/108572025/6075d09e-17a6-4b59-aa30-3e565217c99a)
-
-수익(revenue)에 가장 중요한 요소는 budget(예산)과 인기, 상영시간, 장르 순으로 이루어진 것을 확인할 수 있습니다.
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/2bf23f9b-1a29-4f42-93b7-b984b51cb7d3)
 
 
-## 5. 문의
-프로젝트에 관한 문의나 버그 리포트는 [이슈 페이지](https://github.com/auspicious0/MovieRevenue/issues)를 통해 제출해주세요.
+## 5. 결론
 
-보다 더 자세한 내용을 원하신다면 [보고서](https://github.com/auspicious0/MovieRevenue/blob/main/boxoffice_RandomForest.ipynb) 를 확인해 주시기 바랍니다.
+예측을 진행함에 있어서 하이퍼 파라미터로 변경 된 것과 또 train 을 통해 svm 벡터를 생성한 것과 원래 svm 벡터 사이의 차이가 존재하지 않았습니다.
+
+이는 최적의 파라미터를 찾는 과정에서 넓은 변수의 스펙트럼을 통해 찾지 못한 것에 폐착 요인이 있을 수 있습니다.
+
+따라서 제가 임의로 데이터를 줄여 넓은 변수 스펙트럼 하에 하이퍼 파라미터를 찾아 보았지만 데이터가 줄었다는 것에 의미가 손실된다고 생각합니다.
+
+고로 이러한 문제를 해결할 수 있는 방법이나 제가 차마 놓친 개념이 있다면 [이슈 페이지](https://github.com/auspicious0/MovieRevenue/issues)를 통해 제출 부탁드립니다.
+
+보다 더 자세한 내용을 원하신다면  [보고서](https://github.com/auspicious0/MovieRevenue/blob/main/boxoffice_RandomForest.ipynb) 를 확인해 주시기 바랍니다.
+
+
+
