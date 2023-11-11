@@ -152,91 +152,86 @@ boxplot(lo_)
 무작위로 데이터를 분리하지 않고 반응변수를 중심으로 8:2로 나누기 위해 caret::createDataPartition을 사용하겠습니다.
 
 ```
-install.packages("Hmisc")
-library(Hmisc)
-mr$budget <- impute(mr$budget, median) #mean, median, 특정숫자
-
-#mr$revenue <- impute(mr$revenue, median) #mean, median, 특정숫자
-#아무래도 revenue 는 반응변수 종속변수이다 보니 같은 숫자가 너무 많으면 
-#문제가 될 것으로 예상됩니다. 또한 남은 결측값이 많긴 하지만
-#데이터가 너무 많아 후에 있을 분석 진행에 차질이 발생하여
-#na.omit으로 삭제한 후 진행하겠습니다.
-mr <- mr %>% na.omit()
-```
-
-이상값 처리를 진행해보겠습니다.
-
-```
-# 이상치 및 결측값 처리 함수
-
-calculate_outliers <- function(data, column_name) {
-  iqr_value <- IQR(data[[column_name]])
-  upper_limit <- summary(data[[column_name]])[5] + 1.5 * iqr_value
-  lower_limit <- summary(data[[column_name]])[2] - 1.5 * iqr_value
-
-  data[[column_name]] <- ifelse(data[[column_name]] < lower_limit | data[[column_name]] > upper_limit, NA, data[[column_name]])
-
-  return(data)
-}
-table(is.na(mr))
-boxplot(mr$budget,mr$popularity,mr$runtime,mr$revenue)
-# 이상치 및 결측값 처리 및 결과에 대한 상자그림 그리기
-mr <- calculate_outliers(mr, "budget")
-mr <- calculate_outliers(mr, "popularity")
-mr <- calculate_outliers(mr, "runtime")
-mr <- calculate_outliers(mr, "revenue")
-
-table(is.na(mr))
-mr <- na.omit(mr)
-table(is.na(mr))
-boxplot(mr$budget,mr$popularity,mr$runtime,mr$revenue)#char형 변수를 제외하고 정수형 변수만을  boxplot을 그려보겠습니다.
-
-```
-![image](https://github.com/auspicious0/MovieRevenue/assets/108572025/60efe2ae-f0b9-4475-86e4-14c259a60e14)
-
-![image](https://github.com/auspicious0/MovieRevenue/assets/108572025/6ef56431-3c9a-44f1-8a10-9b9fe3b9cdf7)
-
-![image](https://github.com/auspicious0/MovieRevenue/assets/108572025/22d4dcd9-6210-40bd-9dd1-3d3571b0be44)
-
-## 4. bagging 및 RandomForest 분석
-
-데이터를 학습 및 테스트 세트로 분할하고 모델을 생성하여 성능을 평가하고 직관적 이해를 돕기 위해 시각화 해보겠습니다.
-
-### 4-1. 회귀 분석
-
-무작위로 데이터를 분리하지 않고 반응변수를 중심으로 8:2로 나누기 위해 caret::createDataPartition을 사용하겠습니다.
-
-```
-install.packages("caret")
 library(caret)
-index <- caret::createDataPartition(y = mr$revenue, p = 0.8, list = FALSE)
-train <- mr[index, ]
-test <- mr[-index, ]
+index <- caret::createDataPartition(y = lo$not.fully.paid, p = 0.8, list = FALSE)
+train <- lo[index,]
+test <- lo[-index,]
+
+train %>% show()
+test%>% show()
 ```
 
-우선 bagging 모델을 생성하고 bagging 모델의 예측력을 확인해 보겠습니다.
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/cb7becfa-09b8-45ef-832d-9907236b7e8c)
+
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/57f363fa-e73f-4bf1-867c-ca2c01838e8c)
+
+데이터가 잘 분할 되었습니다.
+
+## 4. SVM 분석
+
+SVM 모델을 생성하고 분류 결과를 확인해 보겠습니다.
+
+### 4-1. SVM  모델 생성
+
+train데이터를 이용하여 SVM 모델을 생성하고 분류 결과를 확인해 보겠습니다.
+
+confusionMatrix를 생성하여 실제 결과와 분류 결과를 비교하여 보겠습니다.
 
 ```
-model_bagging <-ipred::bagging(revenue ~ ., data = train, nbagg = 100)
-predict_value_bagging <- predict(model_bagging, test, type = "class")%>%
-  tibble(predict_value_bagging = .)
-predict_check_bagging <- test %>% select(revenue)%>%dplyr::bind_cols(.,predict_value_bagging)
-predict_check_bagging
+svm_basic <- e1071::svm(formula = not.fully.paid ~ ., data = train, type = "C-classification", kernel = "radial")
+summary(svm_basic)
+
+print("svm_basic : train 데이터 분류 결과")
+table(predict(svm_basic, train), train$not.fully.paid)
+
+print("svm_basic : train 데이터 confusionMatrix 결과")
+cm <- caret::confusionMatrix(predict(svm_basic, train), train$not.fully.paid)
+cm
 ```
 
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/73efb4c3-3948-4b46-9670-149e0b1061ea)
 
-![image](https://github.com/auspicious0/MovieRevenue/assets/108572025/80125650-8b87-4a4d-a11b-9db9f9fdf0e7)
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/df2ba943-1f4d-4199-8e25-bd4f455d2e5a)
 
 
-예측값이 우수하지 않아 보입니다. 
+매우 정확히 분류된 것을 알 수 있습니다.
 
-따라서 회귀 분석은 여기서 종료하겠습니다.
+이제 해당 모델을 통해 예측을 수행해 확인해 보고 다시 confusionMatrix를 통해 해당 모델 예측의 성능지표를 확인해 보겠습니다.
+```
+predict_value_svm <- predict(svm_basic, test, type = "C-classification") %>%
+  tibble(predict_value_svm = .)
+predict_check_svm <- test %>% select(not.fully.paid) %>% dplyr::bind_cols(.,predict_value_svm)
+head(predict_check_svm)
+```
 
-### 4-2. 분류 분석
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/729216d7-d357-4403-af12-82795802aab2)
 
-분류 분석을 위해 정수형 변수 revenue를 factor형으로 변환해야 합니다. 
+```
+cm <- caret::confusionMatrix(predict(svm_basic, test), test$not.fully.paid)
+cm
+```
 
-이를 위해
+![image](https://github.com/auspicious0/Loan_SVM/assets/108572025/148c007d-ed28-4a6d-90ed-aa505080dd7a)
+
+
+86퍼센트이 정확도를 확인해 볼 수 있습니다.
+
+이제 하이퍼 파라메터를 조정해보겠습니다.
+
+### 4-2. 하이퍼 파라메터 조
+
+곡률(gamma)과 마진 폭(cost)을 결정하기 위해 튜닝 작업을 수행하겠습니다.
+
+gamma는 10^(-8:1), cost는 1~30 범위로 총 300개 조합으로 튜닝을 진행해 최적의 하이퍼 파라미터를 찾아 저장하려했으나 데이터의 양이 많아 튜닝이 진행되지 않습니다. 따라서 더 작은 범위로 축소하겠습니다. (10^(-3:1), cost = 1:10, 30개 조합)
+
+또 병렬 처리를 진행하겠습니다. tunecontrol 매개변수를 사용하여 병렬 처리를 활성화 해보겠습니다.
+
+```
+install.packages("doParallel")
+library(doParallel)
+registerDoParallel(cores = 4)
+tuned <- e1071::tune.svm(not.fully.paid ~ ., data = train, gamma = 10^(-3:1),cost = 1:10)
+```
 
 revenue의 평균값 미만 데이터는 0,
 
