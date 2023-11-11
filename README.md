@@ -35,7 +35,7 @@ options(repr.plot.width = 7, repr.plot.height = 7)
 
 대출금 관 데이터는 Kaggle에서 제공되며 다음 링크에서 얻을 수 있습니다:
 
-[Kaggle Dataset](#https://www.kaggle.com/datasets/sarahvch/predicting-who-pays-back-loans?select=loan_data.csv)
+[Kaggle Dataset](https://www.kaggle.com/datasets/sarahvch/predicting-who-pays-back-loans?select=loan_data.csv)
 
 
 데이터를 다운로드하고 분석에 활용합니다.
