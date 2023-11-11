@@ -307,9 +307,9 @@ cm
 
 따라서 제가 임의로 데이터를 줄여 넓은 변수 스펙트럼 하에 하이퍼 파라미터를 찾아 보았지만 데이터가 줄었다는 것에 의미가 손실된다고 생각합니다.
 
-고로 이러한 문제를 해결할 수 있는 방법이나 제가 차마 놓친 개념이 있다면 [이슈 페이지](https://github.com/auspicious0/MovieRevenue/issues)를 통해 제출 부탁드립니다.
+고로 이러한 문제를 해결할 수 있는 방법이나 제가 차마 놓친 개념이 있다면 [이슈 페이지](https://github.com/auspicious0/Loan_SVM/issues)를 통해 제출 부탁드립니다.
 
-보다 더 자세한 내용을 원하신다면  [보고서](https://github.com/auspicious0/MovieRevenue/blob/main/boxoffice_RandomForest.ipynb) 를 확인해 주시기 바랍니다.
+보다 더 자세한 내용을 원하신다면  [보고서](https://github.com/auspicious0/Loan_SVM/blob/main/Loan_SVM.ipynb) 를 확인해 주시기 바랍니다.
 
 
 
